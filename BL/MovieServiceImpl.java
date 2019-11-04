@@ -5,8 +5,12 @@ import com.company.base.accenture.movies.Interfaces.MovieAccessService;
 import com.company.base.accenture.movies.ObjModelClass.Movie;
 import com.company.base.accenture.movies.ObjModelClass.Review;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.configurationprocessor.json.JSONException;
+import org.springframework.boot.configurationprocessor.json.JSONObject;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.ws.rs.*;
@@ -20,9 +24,6 @@ import java.util.regex.Pattern;
 
 @Component
 @RestController
-@RequestMapping("/movie")
-@Consumes("application/json")
-@Produces("application/json")
 public class MovieServiceImpl implements Runnable, IContainMovies {
 
     @Autowired
@@ -50,12 +51,45 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
         Collections.sort(moviesList);
     }
 
+
     @Override
     @POST
-    @RequestMapping("/view")
-    public boolean searchFilm(@QueryParam("search") String search) {
+    @RequestMapping("/movie/view/{fromYear}/{toYear}/{fromRating}/{toRating}")
+    public void searchFilm(@QueryParam("search") String search,
+                              @PathVariable(required = false) String fromYear,
+                              @PathVariable(required = false) String toYear,
+                              @PathVariable(required = false) String fromRating,
+                              @PathVariable(required = false) String toRating
+    ) {
+        if(fromYear.equals(null)||toYear.equals(null)||fromRating.equals(null)||toRating.equals(null)) {
+                searchFilm(search);
+        }
+        else if(!(fromYear.equals(null)&&toYear.equals(null)&&fromRating.equals(null)&&toRating.equals(null))){
+            for (Movie movie : moviesList) {
+                String rating = movie.getRating();
+                String year = movie.getYear();
+                if((Double.parseDouble(rating)>=Double.parseDouble(fromRating) && (Double.parseDouble(rating)<=Double.parseDouble(toRating)))
+                        &&(Integer.parseInt(year)>=Integer.parseInt(fromYear) && Integer.parseInt(year)<=Integer.parseInt(toYear))
+                ){
+                    foundMovies.add(movie);
+                }
+            }
+                for (Movie movie : foundMovies) {
+
+                    System.out.println(movie.getNotFullInfo()); //film info
+
+                    System.out.println("\n");
+                }
+            foundMovies.clear();
+        }
+    }
+
+    public boolean searchFilm(String search) {
+
         searchResult = search;
         String imdb=null;
+
+        ended=false;
 
         pattern = Pattern.compile(searchResult.toLowerCase() + ".++"); //{search}.++  greedy matching
 
@@ -67,23 +101,24 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
         }
         ended = true;
 
-        for (Movie movie : moviesList) {
-            String[] movieInfo = movie.getMovieInfo().split(" ");
-            imdb = movieInfo[0];
-            String title = movieInfo[2].toLowerCase();
-            String year = movie.getYear();
-            titleMatcher = pattern.matcher(title);
-            yearMatcher = pattern.matcher(year);
+            for (Movie movie : moviesList) {
+                String[] movieInfo = movie.getMovieInfo().split(" ");
+                imdb = movieInfo[0];
+                String title = movieInfo[2].toLowerCase();
+                String year = movie.getYear();
+                titleMatcher = pattern.matcher(title);
+                yearMatcher = pattern.matcher(year);
 
-            if (titleMatcher.matches() || yearMatcher.matches()
-                    || searchResult.toLowerCase().equals(title) || searchResult.equals(year)) {
-                foundMovies.add(movie);
+                if (titleMatcher.matches() || yearMatcher.matches()
+                        || searchResult.toLowerCase().equals(title) || searchResult.equals(year)) {
+                    foundMovies.add(movie);
+                }
+                if (searchResult.equals(imdb)) {
+                    foundMovies.add(movie);
+                    return true;
+                }
             }
-            if (searchResult.equals(imdb)) {
-                foundMovies.add(movie);
-                return true;
-            }
-        }
+
         if(!searchResult.equals(imdb)) {
             for (Movie movie : foundMovies) {
 
@@ -98,8 +133,8 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
 
     @Override
     @GET
-    @RequestMapping("/id")
-    public void getFilmInfo(@QueryParam("id") String search) {
+    @RequestMapping("/movie/{id}")
+    public void getFilmInfo(@PathVariable("id") String search) throws JSONException {
         if(searchFilm(search)){
             for (Movie movie : foundMovies) {
 
@@ -129,10 +164,11 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
                     }
                 }
             }
-        } else {
-            System.out.println("Фильм не найден!");
         }
-        foundMovies.clear();
+        else {
+            System.out.println("Фильм не найден!");
+            foundMovies.clear();
+        }
     }
 
     public static void setActiveUser(String activeUser) {
@@ -141,34 +177,35 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
 
     @Override
     @POST
-    @RequestMapping("/id/review")
-    public void addReview(@QueryParam("imdb") String imdb,@QueryParam("review") String review, @QueryParam("rating") String rating) {
-        LocalDate date = LocalDate.now();
+    @RequestMapping("/movie/{id}/review")
+    public void addReview(@PathVariable("id") String imdb,@QueryParam("review") String review, @QueryParam("rating") String rating) {
 
-        for (Movie movie : moviesList) {
-            if(!movie.getReviewsList().isEmpty()) {
-                for (Review revEntry : movie.getReviewsList()) {
-                    String[] reviewInfo = revEntry.getReviewInfo().split(" ");
-                    if (imdb.equals(movie.getMovieInfo().split(" ")[0])) {
-                        if (activeUser.equals(reviewInfo[2])) { //login
-                            wroteReview = true;
-                            System.out.println("Вы уже написали обзор!");
-                            return;
+        wroteReview = false;
+        LocalDate date = LocalDate.now();
+        if(!UserServiceImpl.adminMode) {
+            for (Movie movie : moviesList) {
+                if (!movie.getReviewsList().isEmpty()) {
+                    for (Review revEntry : movie.getReviewsList()) {
+                        String[] reviewInfo = revEntry.getReviewInfo().split(" ");
+                        if (imdb.equals(movie.getMovieInfo().split(" ")[0])) {
+                            if (activeUser.equals(reviewInfo[2])) { //login
+                                wroteReview = true;
+                                System.out.println("Вы уже написали обзор!");
+                                return;
+                            }
                         }
                     }
                 }
             }
-
-            if (imdb.equals(movie.getMovieInfo().split(" ")[0])) {
-                if (!wroteReview) {
-                    movie.addReview(review, rating, activeUser, date);
-                    System.out.println("Обзор добавлен!");
+            for (Movie movie : moviesList) {
+                if (imdb.equals(movie.getMovieInfo().split(" ")[0])) {
+                    if (!wroteReview) {
+                        movie.addReview(review, rating, activeUser, date);
+                        System.out.println("Обзор добавлен!");
+                    }
                 }
             }
         }
-
-        wroteReview = false;
-
     }
 
     @Override
@@ -176,10 +213,7 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
     @RequestMapping("/review")
     public void editReview(@QueryParam("imdb") String imdb, @QueryParam("review") String review, @QueryParam("rating") String rating,@QueryParam("login") String login) {//for user
 
-        System.out.println(imdb);
-        System.out.println(review);
-        System.out.println(rating);
-        System.out.println(login);
+
         LocalDate date = LocalDate.now();
 
         if(!UserServiceImpl.adminMode){
@@ -190,7 +224,7 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
             List<Review> reviewsList = movie.getReviewsList();
             for (Review revEntry : reviewsList) {
                 String[] reviewInfo = revEntry.getReviewInfo().split(" ");
-                if (login.equals(reviewInfo[3]) && imdb.equals(reviewInfo[1])) {
+                if (login.equals(reviewInfo[2]) && imdb.equals(movie.getMovieInfo().split(" ")[0])) {
                     movie.editReview(reviewsList.lastIndexOf(revEntry), review, rating, activeUser, date);
                     return;
                 }
@@ -200,8 +234,8 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
 
     @Override
     @DELETE
-    @RequestMapping("/review/id")
-    public void deleteReview(@QueryParam("imdb") String imdb,@QueryParam("login") String login) {
+    @RequestMapping("/review/{id}")
+    public void deleteReview(@PathVariable("id") String imdb,@QueryParam("login") String login) {
 
         if(!UserServiceImpl.adminMode){
             login=MovieServiceImpl.activeUser;
@@ -211,7 +245,7 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
             List<Review> reviewsList = movie.getReviewsList();
             for (Review revEntry : movie.getReviewsList()) {
                 String[] reviewInfo = revEntry.getReviewInfo().split(" ");
-                if (login.equals(reviewInfo[3]) && imdb.equals(reviewInfo[1])) {  // login     imdb
+                if (login.equals(reviewInfo[2]) && imdb.equals(movie.getMovieInfo().split(" ")[0])) {  // login     imdb
                     movie.deleteReview(reviewsList.lastIndexOf(revEntry));
                     return;
                 }
@@ -222,10 +256,14 @@ public class MovieServiceImpl implements Runnable, IContainMovies {
     @Override
     @POST
     @RequestMapping("/review/view")
-    public List<Review> getMyReviews(){
-        List<Review> reviewList = new ArrayList<>();
+    public List<String> getMyReviews(){
+        List<String> reviewList = new ArrayList<>();
         for (Movie movie : moviesList) {
-            reviewList.addAll(movie.getReviewsList());
+            for (Review rev : movie.getReviewsList()) {
+                if (activeUser.equals(rev.getReviewInfo().split(" ")[2])) {
+                    reviewList.add(movie.getMovieInfo().split(" ")[2]+" "+rev.getReviewInfo());
+                }
+            }
         }
         return reviewList;
     }

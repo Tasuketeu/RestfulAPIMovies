@@ -21,7 +21,7 @@ public class Movie implements Comparable<Movie> {
 
     private double ratingToDouble;
 
-    private static List<Review> reviewsList = new ArrayList<>();
+    private List<Review> reviewsList = new ArrayList<>();
 
     public Movie(String imdb, String filmType, String title,
                  String genre, String date, String rating, String description) {
@@ -68,6 +68,9 @@ public class Movie implements Comparable<Movie> {
 
     public String getMovieInfo() {
         return movieInfo;
+    }
+    public String getRating() {
+        return this.rating;
     }
 
     public String getNotFullInfo() {

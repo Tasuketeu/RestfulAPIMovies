@@ -4,6 +4,7 @@ import com.company.base.accenture.movies.BL.MovieServiceImpl;
 import com.company.base.accenture.movies.BL.UserServiceImpl;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -14,7 +15,7 @@ import java.util.Scanner;
 @SpringBootApplication(scanBasePackages = "com.company.base.accenture.movies")
 public class MoviesApplication extends SpringBootServletInitializer {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, JSONException {
         SpringApplication.run(MoviesApplication.class, args);
         //new Main().configure(new SpringApplicationBuilder(Main.class)).run(args);
         ApplicationContext context =
